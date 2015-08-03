@@ -138,10 +138,10 @@ private[ui] class LogPage(parent: WorkerWebUI) extends WebUIPage("logPage") with
     }
 
     // Verify that the normalized path of the log directory is in the working directory
-    val normalizedUri = new URI(logDirectory).normalize()
+    val normalizedUri = new URI(logDirectory.replace(raw"\", raw"/")).normalize()
     val normalizedLogDir = new File(normalizedUri.getPath)
     if (!Utils.isInDirectory(workDir, normalizedLogDir)) {
-      return ("Error: invalid log directory " + logDirectory, 0, 0, 0)
+      return ("Error: invalid log directory=[" + logDirectory + "] workDir=[" + workDir + "] normalizedLogDir=[" + normalizedLogDir + "]", 0, 0, 0)
     }
 
     try {
