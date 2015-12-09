@@ -1,0 +1,69 @@
+sudo: false
+#trigger build
+#sudo: required
+language: scala
+scala:
+   - "2.10.5"
+#jdk:
+#   - oraclejdk7
+# https://github.com/openquery/mariadb-server/blob/be279f850c1d79607bc01d2be127a5072aee8036/.travis.yml
+addons:
+  apt:
+    sources:
+    - r-packages-precise
+    packages:
+    - r-base-core
+    - r-base
+    - r-base-dev
+    #- r-recommended
+    #- pandoc
+    #- python-protobuf
+    #- protobuf-compiler
+    #- python2.7
+
+jdk:
+ - openjdk7
+# Spark 1.5.0 only supports Java 7+.
+before_install:
+#  - sudo apt-get install maven
+  - wget http://apache.claz.org/maven/maven-3/3.3.3/binaries/apache-maven-3.3.3-bin.tar.gz
+  - tar zxvf apache-maven-3.3.3-bin.tar.gz
+  - chmod +x apache-maven-3.3.3/bin/mvn
+  - export M2_HOME=$PWD/apache-maven-3.3.3
+  - export PATH=$PWD/apache-maven-3.3.3/bin:${PATH}
+  - hash -r
+
+#install:
+  #- ls -l -h ~
+  #- cat ~/apt-get-update.log
+  #- ls -l -h /usr/lib/R/bin
+
+before_script:
+  - export M2_HOME=$PWD/apache-maven-3.3.3
+  - export PATH=$PWD/apache-maven-3.3.3/bin:${PATH}
+  - hash -r
+
+env: HADOOP_VERSION="2.6.0" SPARK_VERSION="1.5.3-SNAPSHOT" SPARK_AVRO_VERSION="2.0.1"
+cache:
+   directories:
+     - $HOME/.m2
+     - $HOME/.ivy2
+     - $HOME/.sbt
+
+script:
+    - "./make-distribution.sh --name hadoop2.6 --tgz --with-tachyon -Pyarn -Phadoop-2.6 -Dhadoop.version=2.6.0 -Phive -Phive-thriftserver -Psparkr -DskipTests"
+    - "ls -l -h spark*"
+
+deploy:
+  provider: releases
+  api_key:
+    secure: bnEsRQSBSrDL6KBsmPYhiJnCBzebxK2WBtBl6I6pTWfemDBvkkM2u8dkYqW8Slx7kLkR+s/hUk9r3FoL2EB8jOwyIi7koykkzyyk/iAy2GEu8Ro/6gg+Mz6OscU392ac6pXzk9HvYlaMIP55LSiHt4ydXwy7eDZAeACzWTr9/BLcj2xIwsBPAd6xQtLES5Y6em5EGqRL6BYewfZyhD+2v9YocNUjNU21UJeX8g418lhcyl++fiPfMlxyhsZC+lwEJai5VwohLvlvVImS/SPVxn3rrMrctVxRCgzPNk6Mk+wB4Y80DQB04eHa4ISi3oGBWZTpP4bR5brNn3YjebolCLIzucVyhRDMgO+WM3svZgKClK7Qxp0k2opdgrPISvnDhzN/Dry+GE6dY1BsnqYlx8B4uvfof71T9LM7u6Ps2o3l+dBu9rMZrY7FhMq2sT/oBrLvGrtL6wLAee5W4JCtrPNgjVwJtzGFZIWJ9wA+/WkwfV51uFxZSi1QC7g9rdoVRxRbxdJIJEPZug3FGZZ4NsgRfN8fUoQoQZw8Grof6zDM0WWdkfxcLlUZAyeSTMqXegRVxXFYqt3m2v2Habv+2wxWFoMyhlv1sDXvqr2RgRgJbQeoYVuJLHRcjMt1rSkRRsPoauo8uJWV0aTza2TGb2uZvI8+E7uMERLsloxJLBo=
+  #file: "spark-1.5.3-SNAPSHOT-bin-hadoop2.6.tgz"
+  file:
+    - "spark-1.5.3-SNAPSHOT-bin-hadoop2.6.tgz"
+    - "$HOME/sparkbuild.log"
+  skip_cleanup: true
+  on:
+    repo: danielli90/spark
+    branch: branch-1.5
+    tags: true
