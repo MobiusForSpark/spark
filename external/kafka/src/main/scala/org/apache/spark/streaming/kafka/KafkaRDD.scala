@@ -259,8 +259,14 @@ object KafkaRDD {
     }.toMap
 
     val offsetRanges = fromOffsets.map { case (tp, fo) =>
-        val uo = untilOffsets(tp)
-        OffsetRange(tp.topic, tp.partition, fo, uo.offset)
+
+      val uo = if (untilOffsets.contains(tp)) {
+        untilOffsets(tp).offset
+      } else {
+        fo
+      }
+
+      OffsetRange(tp.topic, tp.partition, fo, uo)
     }.toArray
 
     new KafkaRDD[K, V, U, T, R](sc, kafkaParams, offsetRanges, leaders, messageHandler)
