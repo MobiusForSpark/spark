@@ -189,7 +189,24 @@ BUILD_COMMAND=("$MVN" clean package -DskipTests $@)
 echo -e "\nBuilding with..."
 echo -e "\$ ${BUILD_COMMAND[@]}\n"
 
-"${BUILD_COMMAND[@]}"
+#"${BUILD_COMMAND[@]}"
+"${BUILD_COMMAND[@]}" &> "$HOME/sparkbuild.log" &
+
+build_pid=$!
+COUNTER=0
+while ps | grep " $build_pid "
+do
+  let COUNTER=COUNTER+1
+  echo "$(date), counter:$COUNTER - $build_pid is still in the ps output. Must still be running."
+  sleep 1m
+done
+
+echo Oh, it looks like the build process is done.
+wait $build_pid
+build_status=$?
+echo The exit status of the build process was $build_status
+
+tail -100 "$HOME/sparkbuild.log"
 
 # Make directories
 rm -rf "$DISTDIR"

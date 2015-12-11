@@ -59,7 +59,7 @@
   </issueManagement>
 
   <prerequisites>
-    <maven>3.0.4</maven>
+    <maven>3.3.3</maven>
   </prerequisites>
 
   <mailingLists>
@@ -102,7 +102,6 @@
     <module>external/twitter</module>
     <module>external/flume</module>
     <module>external/flume-sink</module>
-    <module>external/mqtt</module>
     <module>external/zeromq</module>
     <module>examples</module>
     <module>repl</module>
@@ -1141,7 +1140,7 @@
               <configuration>
                 <rules>
                   <requireMavenVersion>
-                    <version>3.0.4</version>
+                    <version>3.3.3</version>
                   </requireMavenVersion>
                   <requireJavaVersion>
                     <version>${java.version}</version>
@@ -1779,6 +1778,18 @@
           <version>3.4.5-mapr-1406</version>
         </dependency>
       </dependencies>
+    </profile>
+
+    <!-- workaround build error by moving mqtt into its own profile
+    [INFO] Reading assembly descriptor: src/main/assembly/assembly.xml
+    [WARNING] The assembly descriptor contains a filesystem-root relative reference, which is not cross platform compatible /
+    -->
+    <profile>
+      <id>mqtt</id>
+      <modules>
+        <module>external/mqtt</module>
+        <module>external/mqtt-assembly</module>
+      </modules>
     </profile>
 
     <profile>

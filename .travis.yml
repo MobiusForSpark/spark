@@ -1,0 +1,46 @@
+sudo: false
+language: scala
+scala:
+- 2.10.5
+addons:
+  apt:
+    sources:
+    - r-packages-precise
+    packages:
+    - r-base-core
+    - r-base
+    - r-base-dev
+jdk:
+- openjdk7
+before_install:
+- wget http://apache.claz.org/maven/maven-3/3.3.3/binaries/apache-maven-3.3.3-bin.tar.gz
+- tar zxvf apache-maven-3.3.3-bin.tar.gz
+- chmod +x apache-maven-3.3.3/bin/mvn
+- export M2_HOME=$PWD/apache-maven-3.3.3
+- export PATH=$PWD/apache-maven-3.3.3/bin:${PATH}
+- hash -r
+before_script:
+- export M2_HOME=$PWD/apache-maven-3.3.3
+- export PATH=$PWD/apache-maven-3.3.3/bin:${PATH}
+- hash -r
+env: HADOOP_VERSION="2.6.0" SPARK_VERSION="1.4.3-SNAPSHOT" SPARK_AVRO_VERSION="2.0.1"
+cache:
+  directories:
+  - $HOME/.m2
+  - $HOME/.ivy2
+  - $HOME/.sbt
+script:
+- ./make-distribution.sh --name hadoop2.6 --tgz --with-tachyon -Pyarn -Phadoop-2.6
+  -Dhadoop.version=2.6.0 -Phive -Phive-thriftserver -Psparkr -DskipTests
+- ls -l -h spark*
+deploy:
+  provider: releases
+  api_key:
+    secure: QwhZel0RzBL/pZr63ntNUEJHmSWn8ySVGhr20p9Y4y8uvSvnL1zBHA23Ygdkph4H0f096HXIu8cC6R5UYaD6UoLkvRpWjVognSeJ3ihpH7Q102hnICK9435oOL+z3olJ0YobzB7EjpxzsxZKFg34KQX/FPzT5TXEsv0idTnOAh1LcJbCvAFteQxAX6dQPdKcGLXo1PKQYYITiwAjtevvif11mPGGEgmVXhs+fWwT9NinRiKLYQbGaXR+hGVHsvfNm/nxSWFc9MLjD/AcYVBl4xnee0NUvdrwNCy2VWSEllgIQhbQ2kFTCbZO7WAh+DRSpqVFiSbORFldQNJamhwQ+4UPoL0C5w2MJlUi29z5QZNnmYyavQMy+dDm0xOJkEAFKh8bL1ohIIMc2SppIOjZPgUqYqWvmxw6LYzEKrOJ+sFacXrBZ+pyOyH2LUhUvpNwZG9ujdiPzbR3GIBQ7qNtIwa8VkbPj5zGNIra7p1dA2kmcNmO0+rWE/VKf9r4K9+Z2/qu2XiX2NwZ30/W4uQqqogSZmkLh1NIT26AvfEAsrzO1cfV5OCv8vB1ksZX3wlKQHRIZyoexJangBENcP/0AT1zfme8ac9foqVMsw4HfR1jQhkXBUBcGqsiCeIDxd0ZS+FutKz70AYZVswrF3hgQvJUvKh+K8s15hF/UpLmRTs=
+  file: 
+  - "spark-1.4.3-SNAPSHOT-bin-hadoop2.6.tgz"
+  - "$HOME/sparkbuild.log"
+  on:
+    repo: SparkCLR/spark
+    branch: branch-1.4
+    tags: true
