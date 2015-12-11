@@ -102,6 +102,7 @@
     <module>external/twitter</module>
     <module>external/flume</module>
     <module>external/flume-sink</module>
+    <module>external/mqtt</module>
     <module>external/zeromq</module>
     <module>examples</module>
     <module>repl</module>
@@ -1784,13 +1785,13 @@
     [INFO] Reading assembly descriptor: src/main/assembly/assembly.xml
     [WARNING] The assembly descriptor contains a filesystem-root relative reference, which is not cross platform compatible /
     -->
-    <profile>
+    <!--<profile>
       <id>mqtt</id>
       <modules>
         <module>external/mqtt</module>
         <module>external/mqtt-assembly</module>
       </modules>
-    </profile>
+    </profile>-->
 
     <profile>
       <id>hive-thriftserver</id>
