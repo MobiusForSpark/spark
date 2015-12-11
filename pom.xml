@@ -1781,18 +1781,6 @@
       </dependencies>
     </profile>
 
-    <!-- workaround build error by moving mqtt into its own profile
-    [INFO] Reading assembly descriptor: src/main/assembly/assembly.xml
-    [WARNING] The assembly descriptor contains a filesystem-root relative reference, which is not cross platform compatible /
-    -->
-    <!--<profile>
-      <id>mqtt</id>
-      <modules>
-        <module>external/mqtt</module>
-        <module>external/mqtt-assembly</module>
-      </modules>
-    </profile>-->
-
     <profile>
       <id>hive-thriftserver</id>
       <modules>
