@@ -96,8 +96,7 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
         }
       }.toMap
 
-      if (true) {
-        //if (leaderMap.keys.size == topicAndPartitions.size) {
+      if (leaderMap.keys.size == topicAndPartitions.size) {
         Right(leaderMap)
       } else {
         val missing = topicAndPartitions.diff(leaderMap.keySet)
@@ -207,8 +206,7 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
             }
           }
         }
-        if (true) {
-          //if (result.keys.size == topicAndPartitions.size) {
+        if (result.keys.size == topicAndPartitions.size) {
           return Right(result)
         }
       }
