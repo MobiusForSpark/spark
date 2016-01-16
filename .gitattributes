@@ -1,5 +1,6 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+# * text=auto
+# caused failure in travis bug - changing CR/LF to LF on binaries
 
 *.bat text eol=crlf
 *.cmd text eol=crlf
