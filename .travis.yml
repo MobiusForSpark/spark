@@ -42,5 +42,5 @@ deploy:
   - "spark-1.6.0-SNAPSHOT-bin-hadoop2.6.tgz"
   - "$HOME/sparkbuild.log"
   on:
-    repo: SparkCLR/spark
+    repo: MobiusForSpark/spark
     tags: true
