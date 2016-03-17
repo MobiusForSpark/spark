@@ -188,10 +188,13 @@ let COUNTER=COUNTER+1
 done
 
 echo Oh, it looks like the build process is done.
+echo tail -100 "$HOME/sparkbuild.log"
+tail -100 "$HOME/sparkbuild.log"
 wait $build_pid
 build_status=$?
 echo The exit status of the build process was $build_status
 
+echo tail -100 "$HOME/sparkbuild.log"
 tail -100 "$HOME/sparkbuild.log"
 
 # Make directories
