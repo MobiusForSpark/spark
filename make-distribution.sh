@@ -194,9 +194,6 @@ wait $build_pid
 build_status=$?
 echo The exit status of the build process was $build_status
 
-echo tail -100 "$HOME/sparkbuild.log"
-tail -100 "$HOME/sparkbuild.log"
-
 # Make directories
 rm -rf "$DISTDIR"
 mkdir -p "$DISTDIR/lib"
