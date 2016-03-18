@@ -37,14 +37,9 @@ private[spark] class PythonWorkerFactory(pythonExec: String, envVars: Map[String
   // by setting "spark.python.worker.useDaemon" to "true" explicitly. Otherwise, only works on
   // UNIX-based systems now because it uses signals for child management, so we can
   // also fall back to launching workers (pyspark/worker.py) directly.
-  val useDaemon = {
-    val useDaemonProperty = System.getProperty("spark.python.worker.useDaemon")
-    if (useDaemonProperty != null) {
-      useDaemonProperty.equalsIgnoreCase("true")
-    } else {
-      !System.getProperty("os.name").startsWith("Windows")
-    }
-  }
+  val useDaemon = SparkEnv.get.conf.getBoolean(
+    "spark.python.worker.useDaemon",
+    !System.getProperty("os.name").startsWith("Windows"))
 
   var daemon: Process = null
   val daemonHost = InetAddress.getByAddress(Array(127, 0, 0, 1))
