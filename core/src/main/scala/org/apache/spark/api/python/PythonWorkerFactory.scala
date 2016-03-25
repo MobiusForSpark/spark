@@ -33,10 +33,13 @@ private[spark] class PythonWorkerFactory(pythonExec: String, envVars: Map[String
   import PythonWorkerFactory._
 
   // Because forking processes from Java is expensive, we prefer to launch a single Python daemon
-  // (pyspark/daemon.py) and tell it to fork new workers for our tasks. This daemon currently
-  // only works on UNIX-based systems now because it uses signals for child management, so we can
+  // (pyspark/daemon.py) and tell it to fork new workers for our tasks. This option can be enabled
+  // by setting "spark.python.worker.useDaemon" to "true" explicitly. Otherwise, only works on
+  // UNIX-based systems now because it uses signals for child management, so we can
   // also fall back to launching workers (pyspark/worker.py) directly.
-  val useDaemon = !System.getProperty("os.name").startsWith("Windows")
+  val useDaemon = SparkEnv.get.conf.getBoolean(
+    "spark.python.worker.useDaemon",
+    !System.getProperty("os.name").startsWith("Windows"))
 
   var daemon: Process = null
   val daemonHost = InetAddress.getByAddress(Array(127, 0, 0, 1))
