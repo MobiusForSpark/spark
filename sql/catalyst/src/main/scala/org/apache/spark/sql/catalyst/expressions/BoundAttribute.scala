@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
-import org.apache.spark.Logging
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.errors.attachTree
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
@@ -61,7 +61,14 @@ case class BoundReference(ordinal: Int, dataType: DataType, nullable: Boolean)
   override def genCode(ctx: CodegenContext, ev: ExprCode): String = {
     val javaType = ctx.javaType(dataType)
     val value = ctx.getValue(ctx.INPUT_ROW, dataType, ordinal.toString)
-    if (nullable) {
+    if (ctx.currentVars != null && ctx.currentVars(ordinal) != null) {
+      val oev = ctx.currentVars(ordinal)
+      ev.isNull = oev.isNull
+      ev.value = oev.value
+      val code = oev.code
+      oev.code = ""
+      code
+    } else if (nullable) {
       s"""
         boolean ${ev.isNull} = ${ctx.INPUT_ROW}.isNullAt($ordinal);
         $javaType ${ev.value} = ${ev.isNull} ? ${ctx.defaultValue(dataType)} : ($value);

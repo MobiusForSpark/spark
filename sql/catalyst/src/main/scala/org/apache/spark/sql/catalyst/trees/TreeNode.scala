@@ -22,21 +22,19 @@ import java.util.UUID
 import scala.collection.Map
 import scala.collection.mutable.Stack
 
+import org.apache.commons.lang.ClassUtils
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.{EmptyRDD, RDD}
-import org.apache.spark.sql.catalyst.{ScalaReflectionLock, TableIdentifier}
 import org.apache.spark.sql.catalyst.ScalaReflection._
+import org.apache.spark.sql.catalyst.ScalaReflectionLock
 import org.apache.spark.sql.catalyst.errors._
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.Statistics
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.unsafe.types.{CalendarInterval, UTF8String}
 import org.apache.spark.util.Utils
 
 /** Used by [[TreeNode.getNodeNumbered]] when traversing the tree for a given number */
@@ -244,6 +242,7 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
    * When `rule` does not apply to a given node it is left unchanged.
    * Users should not expect a specific directionality. If a specific directionality is needed,
    * transformDown or transformUp should be used.
+   *
    * @param rule the function use to transform this nodes children
    */
   def transform(rule: PartialFunction[BaseType, BaseType]): BaseType = {
@@ -253,6 +252,7 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
   /**
    * Returns a copy of this node where `rule` has been recursively applied to it and all of its
    * children (pre-order). When `rule` does not apply to a given node it is left unchanged.
+   *
    * @param rule the function used to transform this nodes children
    */
   def transformDown(rule: PartialFunction[BaseType, BaseType]): BaseType = {
@@ -265,6 +265,26 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
       transformChildren(rule, (t, r) => t.transformDown(r))
     } else {
       afterRule.transformChildren(rule, (t, r) => t.transformDown(r))
+    }
+  }
+
+  /**
+   * Returns a copy of this node where `rule` has been recursively applied first to all of its
+   * children and then itself (post-order). When `rule` does not apply to a given node, it is left
+   * unchanged.
+   *
+   * @param rule the function use to transform this nodes children
+   */
+  def transformUp(rule: PartialFunction[BaseType, BaseType]): BaseType = {
+    val afterRuleOnChildren = transformChildren(rule, (t, r) => t.transformUp(r))
+    if (this fastEquals afterRuleOnChildren) {
+      CurrentOrigin.withOrigin(origin) {
+        rule.applyOrElse(this, identity[BaseType])
+      }
+    } else {
+      CurrentOrigin.withOrigin(origin) {
+        rule.applyOrElse(afterRuleOnChildren, identity[BaseType])
+      }
     }
   }
 
@@ -333,25 +353,6 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
   }
 
   /**
-   * Returns a copy of this node where `rule` has been recursively applied first to all of its
-   * children and then itself (post-order). When `rule` does not apply to a given node, it is left
-   * unchanged.
-   * @param rule the function use to transform this nodes children
-   */
-  def transformUp(rule: PartialFunction[BaseType, BaseType]): BaseType = {
-    val afterRuleOnChildren = transformChildren(rule, (t, r) => t.transformUp(r))
-    if (this fastEquals afterRuleOnChildren) {
-      CurrentOrigin.withOrigin(origin) {
-        rule.applyOrElse(this, identity[BaseType])
-      }
-    } else {
-      CurrentOrigin.withOrigin(origin) {
-        rule.applyOrElse(afterRuleOnChildren, identity[BaseType])
-      }
-    }
-  }
-
-  /**
    * Args to the constructor that should be copied, but not transformed.
    * These are appended to the transformed args automatically by makeCopy
    * @return
@@ -365,20 +366,32 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
    * @param newArgs the new product arguments.
    */
   def makeCopy(newArgs: Array[AnyRef]): BaseType = attachTree(this, "makeCopy") {
+    // Skip no-arg constructors that are just there for kryo.
     val ctors = getClass.getConstructors.filter(_.getParameterTypes.size != 0)
     if (ctors.isEmpty) {
       sys.error(s"No valid constructor for $nodeName")
     }
-    val defaultCtor = ctors.maxBy(_.getParameterTypes.size)
+    val allArgs: Array[AnyRef] = if (otherCopyArgs.isEmpty) {
+      newArgs
+    } else {
+      newArgs ++ otherCopyArgs
+    }
+    val defaultCtor = ctors.find { ctor =>
+      if (ctor.getParameterTypes.length != allArgs.length) {
+        false
+      } else if (allArgs.contains(null)) {
+        // if there is a `null`, we can't figure out the class, therefore we should just fallback
+        // to older heuristic
+        false
+      } else {
+        val argsArray: Array[Class[_]] = allArgs.map(_.getClass)
+        ClassUtils.isAssignable(argsArray, ctor.getParameterTypes, true /* autoboxing */)
+      }
+    }.getOrElse(ctors.maxBy(_.getParameterTypes.length)) // fall back to older heuristic
 
     try {
       CurrentOrigin.withOrigin(origin) {
-        // Skip no-arg constructors that are just there for kryo.
-        if (otherCopyArgs.isEmpty) {
-          defaultCtor.newInstance(newArgs: _*).asInstanceOf[BaseType]
-        } else {
-          defaultCtor.newInstance((newArgs ++ otherCopyArgs).toArray: _*).asInstanceOf[BaseType]
-        }
+        defaultCtor.newInstance(allArgs.toArray: _*).asInstanceOf[BaseType]
       }
     } catch {
       case e: java.lang.IllegalArgumentException =>
@@ -446,13 +459,61 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
   }
 
   /**
+   * All the nodes that will be used to generate tree string.
+   *
+   * For example:
+   *
+   *   WholeStageCodegen
+   *   +-- SortMergeJoin
+   *       |-- InputAdapter
+   *       |   +-- Sort
+   *       +-- InputAdapter
+   *           +-- Sort
+   *
+   * the treeChildren of WholeStageCodegen will be Seq(Sort, Sort), it will generate a tree string
+   * like this:
+   *
+   *   WholeStageCodegen
+   *   : +- SortMergeJoin
+   *   :    :- INPUT
+   *   :    :- INPUT
+   *   :-  Sort
+   *   :-  Sort
+   */
+  protected def treeChildren: Seq[BaseType] = children
+
+  /**
+   * All the nodes that are parts of this node.
+   *
+   * For example:
+   *
+   *   WholeStageCodegen
+   *   +- SortMergeJoin
+   *      |-- InputAdapter
+   *      |   +-- Sort
+   *      +-- InputAdapter
+   *          +-- Sort
+   *
+   * the innerChildren of WholeStageCodegen will be Seq(SortMergeJoin), it will generate a tree
+   * string like this:
+   *
+   *   WholeStageCodegen
+   *   : +- SortMergeJoin
+   *   :    :- INPUT
+   *   :    :- INPUT
+   *   :-  Sort
+   *   :-  Sort
+   */
+  protected def innerChildren: Seq[BaseType] = Nil
+
+  /**
    * Appends the string represent of this node and its children to the given StringBuilder.
    *
    * The `i`-th element in `lastChildren` indicates whether the ancestor of the current node at
    * depth `i + 1` is the last child of its own parent node.  The depth of the root node is 0, and
    * `lastChildren` for the root node should be empty.
    */
-  protected def generateTreeString(
+  def generateTreeString(
       depth: Int, lastChildren: Seq[Boolean], builder: StringBuilder): StringBuilder = {
     if (depth > 0) {
       lastChildren.init.foreach { isLast =>
@@ -467,9 +528,15 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
     builder.append(simpleString)
     builder.append("\n")
 
-    if (children.nonEmpty) {
-      children.init.foreach(_.generateTreeString(depth + 1, lastChildren :+ false, builder))
-      children.last.generateTreeString(depth + 1, lastChildren :+ true, builder)
+    if (innerChildren.nonEmpty) {
+      innerChildren.init.foreach(_.generateTreeString(
+        depth + 2, lastChildren :+ false :+ false, builder))
+      innerChildren.last.generateTreeString(depth + 2, lastChildren :+ false :+ true, builder)
+    }
+
+    if (treeChildren.nonEmpty) {
+      treeChildren.init.foreach(_.generateTreeString(depth + 1, lastChildren :+ false, builder))
+      treeChildren.last.generateTreeString(depth + 1, lastChildren :+ true, builder)
     }
 
     builder
@@ -509,7 +576,7 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
   }
 
   protected def jsonFields: List[JField] = {
-    val fieldNames = getConstructorParameters(getClass).map(_._1)
+    val fieldNames = getConstructorParameterNames(getClass)
     val fieldValues = productIterator.toSeq ++ otherCopyArgs
     assert(fieldNames.length == fieldValues.length, s"${getClass.getSimpleName} fields: " +
       fieldNames.mkString(", ") + s", values: " + fieldValues.map(_.toString).mkString(", "))
@@ -557,7 +624,7 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
     case obj if obj.getClass.getName.endsWith("$") => "object" -> obj.getClass.getName
     // returns null if the product type doesn't have a primary constructor, e.g. HiveFunctionWrapper
     case p: Product => try {
-      val fieldNames = getConstructorParameters(p.getClass).map(_._1)
+      val fieldNames = getConstructorParameterNames(p.getClass)
       val fieldValues = p.productIterator.toSeq
       assert(fieldNames.length == fieldValues.length)
       ("product-class" -> JString(p.getClass.getName)) :: fieldNames.zip(fieldValues).map {
@@ -653,6 +720,8 @@ object TreeNode {
       case t if t <:< definitions.DoubleTpe =>
         value.asInstanceOf[JDouble].num: java.lang.Double
 
+      case t if t <:< localTypeOf[java.lang.Boolean] =>
+        value.asInstanceOf[JBool].value: java.lang.Boolean
       case t if t <:< localTypeOf[BigInt] => value.asInstanceOf[JInt].num
       case t if t <:< localTypeOf[java.lang.String] => value.asInstanceOf[JString].s
       case t if t <:< localTypeOf[UUID] => UUID.fromString(value.asInstanceOf[JString].s)

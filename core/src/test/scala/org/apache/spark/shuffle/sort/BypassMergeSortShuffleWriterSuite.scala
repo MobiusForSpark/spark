@@ -66,7 +66,7 @@ class BypassMergeSortShuffleWriterSuite extends SparkFunSuite with BeforeAndAfte
       dependency = dependency
     )
     when(dependency.partitioner).thenReturn(new HashPartitioner(7))
-    when(dependency.serializer).thenReturn(Some(new JavaSerializer(conf)))
+    when(dependency.serializer).thenReturn(new JavaSerializer(conf))
     when(taskContext.taskMetrics()).thenReturn(taskMetrics)
     when(blockResolver.getDataFile(0, 0)).thenReturn(outputFile)
     doAnswer(new Answer[Void] {
@@ -145,8 +145,8 @@ class BypassMergeSortShuffleWriterSuite extends SparkFunSuite with BeforeAndAfte
     assert(outputFile.length() === 0)
     assert(temporaryFilesCreated.isEmpty)
     val shuffleWriteMetrics = taskContext.taskMetrics().shuffleWriteMetrics.get
-    assert(shuffleWriteMetrics.shuffleBytesWritten === 0)
-    assert(shuffleWriteMetrics.shuffleRecordsWritten === 0)
+    assert(shuffleWriteMetrics.bytesWritten === 0)
+    assert(shuffleWriteMetrics.recordsWritten === 0)
     assert(taskMetrics.diskBytesSpilled === 0)
     assert(taskMetrics.memoryBytesSpilled === 0)
   }
@@ -166,11 +166,11 @@ class BypassMergeSortShuffleWriterSuite extends SparkFunSuite with BeforeAndAfte
     writer.stop( /* success = */ true)
     assert(temporaryFilesCreated.nonEmpty)
     assert(writer.getPartitionLengths.sum === outputFile.length())
-    assert(writer.getPartitionLengths.filter(_ == 0L).size === 4) // should be 4 zero length files
+    assert(writer.getPartitionLengths.count(_ == 0L) === 4) // should be 4 zero length files
     assert(temporaryFilesCreated.count(_.exists()) === 0) // check that temporary files were deleted
     val shuffleWriteMetrics = taskContext.taskMetrics().shuffleWriteMetrics.get
-    assert(shuffleWriteMetrics.shuffleBytesWritten === outputFile.length())
-    assert(shuffleWriteMetrics.shuffleRecordsWritten === records.length)
+    assert(shuffleWriteMetrics.bytesWritten === outputFile.length())
+    assert(shuffleWriteMetrics.recordsWritten === records.length)
     assert(taskMetrics.diskBytesSpilled === 0)
     assert(taskMetrics.memoryBytesSpilled === 0)
   }

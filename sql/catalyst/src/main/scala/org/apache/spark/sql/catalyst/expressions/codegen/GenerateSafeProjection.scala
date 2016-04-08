@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.expressions.codegen
 
+import scala.annotation.tailrec
+
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.NoOp
 import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, GenericArrayData}
@@ -120,6 +122,7 @@ object GenerateSafeProjection extends CodeGenerator[Seq[Expression], Projection]
     ExprCode(code, "false", output)
   }
 
+  @tailrec
   private def convertToSafe(
       ctx: CodegenContext,
       input: String,
@@ -160,13 +163,13 @@ object GenerateSafeProjection extends CodeGenerator[Seq[Expression], Projection]
 
         private Object[] references;
         private MutableRow mutableRow;
-        ${declareMutableStates(ctx)}
-        ${declareAddedFunctions(ctx)}
+        ${ctx.declareMutableStates()}
+        ${ctx.declareAddedFunctions()}
 
         public SpecificSafeProjection(Object[] references) {
           this.references = references;
-          mutableRow = new $genericMutableRowType(${expressions.size});
-          ${initMutableStates(ctx)}
+          mutableRow = (MutableRow) references[references.length - 1];
+          ${ctx.initMutableStates()}
         }
 
         public java.lang.Object apply(java.lang.Object _i) {
@@ -179,7 +182,8 @@ object GenerateSafeProjection extends CodeGenerator[Seq[Expression], Projection]
 
     logDebug(s"code for ${expressions.mkString(",")}:\n${CodeFormatter.format(code)}")
 
-    val c = compile(code)
-    c.generate(ctx.references.toArray).asInstanceOf[Projection]
+    val c = CodeGenerator.compile(code)
+    val resultRow = new SpecificMutableRow(expressions.map(_.dataType))
+    c.generate(ctx.references.toArray :+ resultRow).asInstanceOf[Projection]
   }
 }
