@@ -63,12 +63,15 @@ public class TransportClientFactory implements Closeable {
   private static class ClientPool {
     TransportClient[] clients;
     Object[] locks;
+    Long[] clientsFailTime;  // if fail to create client, record the time when it fails
 
     public ClientPool(int size) {
       clients = new TransportClient[size];
       locks = new Object[size];
+      clientsFailTime = new Long[size];
       for (int i = 0; i < size; i++) {
         locks[i] = new Object();
+        clientsFailTime[i] = 0L;
       }
     }
   }
@@ -153,6 +156,7 @@ public class TransportClientFactory implements Closeable {
 
     // If we reach here, we don't have an existing connection open. Let's create a new one.
     // Multiple threads might race here to create new connections. Keep only one of them active.
+    Long clientCreateTime = System.currentTimeMillis();
     synchronized (clientPool.locks[clientIndex]) {
       cachedClient = clientPool.clients[clientIndex];
 
@@ -163,8 +167,23 @@ public class TransportClientFactory implements Closeable {
         } else {
           logger.info("Found inactive connection to {}, creating a new one.", address);
         }
+      } else {
+        if ((clientPool.clientsFailTime[clientIndex] != 0L) && (clientCreateTime < clientPool.clientsFailTime[clientIndex])) {
+          throw new RuntimeException("fail createClient quickly because of recent failure");
+        } else {
+          logger.info("Found no connection to {}, creating a new one.", address);
+        }
       }
-      clientPool.clients[clientIndex] = createClient(address);
+
+      try {
+        clientPool.clients[clientIndex] = createClient(address);
+      } catch (IOException ioe) {
+        logger.error("createClient exception: ", ioe);
+        clientPool.clients[clientIndex] = null;
+        clientPool.clientsFailTime[clientIndex] = System.currentTimeMillis();
+        throw ioe;
+      }
+
       return clientPool.clients[clientIndex];
     }
   }
