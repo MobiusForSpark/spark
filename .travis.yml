@@ -45,7 +45,22 @@ notifications:
 install:
   - export MAVEN_SKIP_RC=1
   - build/mvn -T 4 -q -DskipTests -Pyarn -Phadoop-2.3 -Pkinesis-asl -Phive -Phive-thriftserver install
+  - "ls -l -h spark*"
 
 # 6. Run lint-java.
 script:
   - dev/lint-java
+
+deploy:
+  provider: releases
+  api_key:
+    secure: bnEsRQSBSrDL6KBsmPYhiJnCBzebxK2WBtBl6I6pTWfemDBvkkM2u8dkYqW8Slx7kLkR+s/hUk9r3FoL2EB8jOwyIi7koykkzyyk/iAy2GEu8Ro/6gg+Mz6OscU392ac6pXzk9HvYlaMIP55LSiHt4ydXwy7eDZAeACzWTr9/BLcj2xIwsBPAd6xQtLES5Y6em5EGqRL6BYewfZyhD+2v9YocNUjNU21UJeX8g418lhcyl++fiPfMlxyhsZC+lwEJai5VwohLvlvVImS/SPVxn3rrMrctVxRCgzPNk6Mk+wB4Y80DQB04eHa4ISi3oGBWZTpP4bR5brNn3YjebolCLIzucVyhRDMgO+WM3svZgKClK7Qxp0k2opdgrPISvnDhzN/Dry+GE6dY1BsnqYlx8B4uvfof71T9LM7u6Ps2o3l+dBu9rMZrY7FhMq2sT/oBrLvGrtL6wLAee5W4JCtrPNgjVwJtzGFZIWJ9wA+/WkwfV51uFxZSi1QC7g9rdoVRxRbxdJIJEPZug3FGZZ4NsgRfN8fUoQoQZw8Grof6zDM0WWdkfxcLlUZAyeSTMqXegRVxXFYqt3m2v2Habv+2wxWFoMyhlv1sDXvqr2RgRgJbQeoYVuJLHRcjMt1rSkRRsPoauo8uJWV0aTza2TGb2uZvI8+E7uMERLsloxJLBo=
+  #file: "spark-1.5.3-SNAPSHOT-bin-hadoop2.6.tgz"
+  file:
+    - "spark-2.0.0-SNAPSHOT-bin-hadoop2.3.tgz"
+    - "$HOME/sparkbuild.log"
+  skip_cleanup: true
+  on:
+    repo: danielli90/spark
+    branch: branch-1.5
+    tags: true
