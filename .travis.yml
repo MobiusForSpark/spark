@@ -45,7 +45,7 @@ notifications:
 install:
   - export MAVEN_SKIP_RC=1
   - build/mvn -T 4 -q -DskipTests -Pyarn -Phadoop-2.3 -Pkinesis-asl -Phive -Phive-thriftserver install
-  - "ls -l -h spark*"
+  - "ls -l -h *"
 
 # 6. Run lint-java.
 script:
